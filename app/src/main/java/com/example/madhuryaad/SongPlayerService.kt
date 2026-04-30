@@ -4,11 +4,11 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.MediaPlayer
 import android.os.Build
+import android.os.PowerManager
 import android.os.IBinder
 import android.widget.Toast
 
@@ -42,12 +42,8 @@ class SongPlayerService : Service() {
 
         startAsForeground(songTitle)
 
-        saveCurrentPlaying(
-            scheduleId = scheduleId,
-            hour = hour,
-            minute = minute,
-            songRawName = songRawName,
-            songTitle = songTitle
+        ScheduleStorage.saveCurrentlyPlaying(
+            this, scheduleId, hour, minute, songRawName, songTitle
         )
 
         broadcastPlaybackStarted(
@@ -92,6 +88,7 @@ class SongPlayerService : Service() {
             return
         }
 
+        mediaPlayer?.setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
         mediaPlayer?.isLooping = false
         mediaPlayer?.setVolume(1.0f, 1.0f)
 
@@ -125,7 +122,7 @@ class SongPlayerService : Service() {
     private fun stopPlayback() {
         stopCurrentMediaOnly()
 
-        clearCurrentPlaying()
+        ScheduleStorage.clearCurrentPlaying(this)
         broadcastPlaybackStopped()
 
         try {
@@ -138,7 +135,7 @@ class SongPlayerService : Service() {
 
     override fun onDestroy() {
         stopCurrentMediaOnly()
-        clearCurrentPlaying()
+        ScheduleStorage.clearCurrentPlaying(this)
         broadcastPlaybackStopped()
 
         try {
@@ -196,34 +193,6 @@ class SongPlayerService : Service() {
         }
     }
 
-    private fun saveCurrentPlaying(
-        scheduleId: Int,
-        hour: Int,
-        minute: Int,
-        songRawName: String,
-        songTitle: String
-    ) {
-        getPrefs().edit()
-            .putBoolean(MadhurYaadConstants.PREF_CURRENT_IS_PLAYING, true)
-            .putInt(MadhurYaadConstants.PREF_CURRENT_SCHEDULE_ID, scheduleId)
-            .putInt(MadhurYaadConstants.PREF_CURRENT_HOUR, hour)
-            .putInt(MadhurYaadConstants.PREF_CURRENT_MINUTE, minute)
-            .putString(MadhurYaadConstants.PREF_CURRENT_SONG_RAW_NAME, songRawName)
-            .putString(MadhurYaadConstants.PREF_CURRENT_SONG_TITLE, songTitle)
-            .apply()
-    }
-
-    private fun clearCurrentPlaying() {
-        getPrefs().edit()
-            .putBoolean(MadhurYaadConstants.PREF_CURRENT_IS_PLAYING, false)
-            .remove(MadhurYaadConstants.PREF_CURRENT_SCHEDULE_ID)
-            .remove(MadhurYaadConstants.PREF_CURRENT_HOUR)
-            .remove(MadhurYaadConstants.PREF_CURRENT_MINUTE)
-            .remove(MadhurYaadConstants.PREF_CURRENT_SONG_RAW_NAME)
-            .remove(MadhurYaadConstants.PREF_CURRENT_SONG_TITLE)
-            .apply()
-    }
-
     private fun broadcastPlaybackStarted(
         scheduleId: Int,
         hour: Int,
@@ -250,7 +219,4 @@ class SongPlayerService : Service() {
 
         sendBroadcast(intent)
     }
-
-    private fun getPrefs() =
-        getSharedPreferences(MadhurYaadConstants.PREF_NAME, Context.MODE_PRIVATE)
 }

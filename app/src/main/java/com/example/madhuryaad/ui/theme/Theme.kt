@@ -9,49 +9,38 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+private val MadhurYaadColorScheme = lightColorScheme(
+    primary = Color(0xFF7B4FC6),
     onPrimary = Color.White,
+    primaryContainer = Color(0xFFE9DDFF),
+    onPrimaryContainer = Color(0xFF24113F),
+
+    secondary = Color(0xFF9C6B3F),
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondaryContainer = Color(0xFFFFE1C2),
+    onSecondaryContainer = Color(0xFF331B00),
+
+    background = Color(0xFFFFF8FF),
+    onBackground = Color(0xFF1D1A22),
+
+    surface = Color(0xFFFFF8FF),
+    onSurface = Color(0xFF1D1A22),
+
+    surfaceVariant = Color(0xFFEDE3F2),
+    onSurfaceVariant = Color(0xFF4B4453),
+
+    outline = Color(0xFF7C7284)
 )
 
 @Composable
 fun MadhurYaadTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = MadhurYaadColorScheme,
         typography = Typography,
         content = content
     )
