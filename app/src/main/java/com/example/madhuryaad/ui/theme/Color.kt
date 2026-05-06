@@ -2,10 +2,15 @@ package com.example.madhuryaad.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Brahma Kumaris Refined Palette - Improved Card Visibility
+val BKWhite = Color(0xFFFFFFFF)
+val BKBackground = Color(0xFFFAFAFA)
+val BKRed = Color(0xFFD32F2F) // Point of Light
+val BKRedContainer = Color(0xFFFFEBEE) // Slightly darker/richer red for active cards
+val BKRedDark = Color(0xFF7B0000)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val BKTextMain = Color(0xFF212121) 
+val BKTextSecondary = Color(0xFF757575)
+val BKOutline = Color(0xFFEEEEEE)
+val BKSurfaceVariant = Color(0xFFF2F2F2) // Slightly darker than background for better card definition
+val BKDialogBackground = Color(0xFFFEF7FF) // Very soft lavender/white for peace

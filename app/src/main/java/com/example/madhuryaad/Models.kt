@@ -2,7 +2,7 @@ package com.example.madhuryaad
 
 data class SongOption(
     val title: String,
-    val rawName: String
+    val rawName: String,
 )
 
 data class ScheduleItem(
@@ -11,7 +11,7 @@ data class ScheduleItem(
     val minute: Int,
     val songRawName: String,
     val songTitle: String,
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
 )
 
 data class CurrentlyPlaying(
@@ -19,5 +19,5 @@ data class CurrentlyPlaying(
     val hour: Int,
     val minute: Int,
     val songRawName: String,
-    val songTitle: String
+    val songTitle: String,
 )

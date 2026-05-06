@@ -11,7 +11,7 @@ class SongReceiver : BroadcastReceiver() {
         val scheduleId = intent.getIntExtra(MadhurYaadConstants.EXTRA_SCHEDULE_ID, -1)
         val schedule = ScheduleStorage.findScheduleById(context, scheduleId)
 
-        if (schedule == null || !schedule.enabled) {
+        if ((schedule == null) || (!schedule.enabled)) {
             if (scheduleId != -1) {
                 AlarmScheduler.cancel(context, scheduleId)
             }

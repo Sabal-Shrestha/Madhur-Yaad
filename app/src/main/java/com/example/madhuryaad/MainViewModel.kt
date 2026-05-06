@@ -11,24 +11,14 @@ import androidx.lifecycle.AndroidViewModel
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val context = application.applicationContext
+    private val context get() = getApplication<Application>().applicationContext
 
-    val songOptions = listOf(
-        SongOption("Gemini Man", "gemini_man"),
-        SongOption("Hard Man", "hard_man"),
-        SongOption("Magnet Man", "magnet_man"),
-        SongOption("Needle Man", "needle_man"),
-        SongOption("Shadow Man", "shadow_man"),
-        SongOption("Snake Man", "snake_man"),
-        SongOption("Spark Man", "spark_man"),
-        SongOption("Stage Chosen", "stage_chosen"),
-        SongOption("Title Screen", "title_screen"),
-        SongOption("Top Man", "top_man")
-    )
+    val songOptions = MusicLibrary.getSongOptions(context)
+    val defaultSongOption = MusicLibrary.getDefaultSongOption(context)
 
     val schedules = mutableStateListOf<ScheduleItem>()
 
-    var use24HourFormat by mutableStateOf(false)
+    var use24HourFormat by mutableStateOf(value = false)
         private set
 
     var currentlyPlaying by mutableStateOf<CurrentlyPlaying?>(null)
@@ -39,8 +29,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadData() {
         use24HourFormat = ScheduleStorage.loadUse24HourFormat(context)
+
+        val loadedSchedules = sortSchedules(
+            ScheduleStorage.loadSchedules(context).map { schedule ->
+                schedule.copy(
+                    songTitle = MusicLibrary.getDisplayTitle(
+                        context = context,
+                        rawName = schedule.songRawName,
+                    ),
+                )
+            },
+        )
+
         schedules.clear()
-        schedules.addAll(ScheduleStorage.loadSchedules(context))
+        schedules.addAll(loadedSchedules)
+
+        ScheduleStorage.saveSchedules(context, schedules)
+
         currentlyPlaying = ScheduleStorage.loadCurrentlyPlaying(context)
     }
 
@@ -60,27 +65,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         schedules.add(schedule)
+        sortCurrentSchedules()
         saveAndReschedule(schedule)
     }
 
     fun toggleSchedule(schedule: ScheduleItem, isEnabled: Boolean) {
         val updated = schedule.copy(enabled = isEnabled)
         replaceSchedule(updated)
-        
+
         if (isEnabled) {
             AlarmScheduler.schedule(context, updated)
         } else {
             AlarmScheduler.cancel(context, updated.id)
+
             if (currentlyPlaying?.scheduleId == updated.id) {
                 stopPlaying()
             }
         }
-        
+
         ScheduleStorage.saveSchedules(context, schedules)
     }
 
     fun editScheduleTime(schedule: ScheduleItem, newHour: Int, newMinute: Int) {
-        val updated = schedule.copy(hour = newHour, minute = newMinute)
+        val updated = schedule.copy(
+            hour = newHour,
+            minute = newMinute
+        )
+
         replaceSchedule(updated)
         saveAndReschedule(updated)
     }
@@ -90,6 +101,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             songRawName = newSong.rawName,
             songTitle = newSong.title
         )
+
         replaceSchedule(updated)
         saveAndReschedule(updated)
     }
@@ -100,27 +112,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         AlarmScheduler.cancel(context, schedule.id)
+
         schedules.removeAll { it.id == schedule.id }
+
         ScheduleStorage.saveSchedules(context, schedules)
+    }
+
+    fun deleteAllSchedules() {
+        stopPlaying()
+        schedules.forEach { AlarmScheduler.cancel(context, it.id) }
+        schedules.clear()
+        ScheduleStorage.saveSchedules(context, emptyList())
+    }
+
+    fun restoreDefaultSchedules() {
+        stopPlaying()
+        schedules.forEach { AlarmScheduler.cancel(context, it.id) }
+        schedules.clear()
+
+        val defaults = ScheduleStorage.getDefaultSchedules(context)
+        schedules.addAll(defaults)
+        ScheduleStorage.saveSchedules(context, schedules)
+
+        schedules.forEach {
+            if (it.enabled) {
+                AlarmScheduler.schedule(context, it)
+            }
+        }
     }
 
     private fun replaceSchedule(updated: ScheduleItem) {
         val index = schedules.indexOfFirst { it.id == updated.id }
+
         if (index != -1) {
             schedules[index] = updated
-            // Sort by time
-            val sorted = schedules.sortedWith(
-                compareBy<ScheduleItem> { it.hour * 60 + it.minute }
-                    .thenBy { it.songTitle.lowercase() }
-                    .thenBy { it.id }
-            )
-            schedules.clear()
-            schedules.addAll(sorted)
+            sortCurrentSchedules()
         }
+    }
+
+    private fun sortCurrentSchedules() {
+        val sorted = sortSchedules(schedules)
+
+        schedules.clear()
+        schedules.addAll(sorted)
+    }
+
+    private fun sortSchedules(items: List<ScheduleItem>): List<ScheduleItem> {
+        return items.sortedWith(
+            compareBy<ScheduleItem> { (it.hour * 60) + it.minute }
+                .thenBy { it.songTitle.lowercase() }
+                .thenBy { it.id }
+        )
     }
 
     private fun saveAndReschedule(schedule: ScheduleItem) {
         ScheduleStorage.saveSchedules(context, schedules)
+
         if (schedule.enabled) {
             AlarmScheduler.schedule(context, schedule)
         }
@@ -145,8 +192,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopPlaying() {
         val intent = Intent(context, SongPlayerService::class.java)
+
         context.stopService(intent)
-        
+
         ScheduleStorage.clearCurrentPlaying(context)
         currentlyPlaying = null
     }

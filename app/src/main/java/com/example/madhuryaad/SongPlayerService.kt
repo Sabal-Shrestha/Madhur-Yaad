@@ -6,11 +6,13 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Build
-import android.os.PowerManager
 import android.os.IBinder
+import android.os.PowerManager
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 
 class SongPlayerService : Service() {
 
@@ -30,20 +32,47 @@ class SongPlayerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         currentStartId = startId
 
-        val songRawName = intent?.getStringExtra(MadhurYaadConstants.EXTRA_SONG_RAW_NAME)
-            ?: "gemini_man"
+        if (intent == null) {
+            stopPlayback()
+            return START_NOT_STICKY
+        }
 
-        val songTitle = intent?.getStringExtra(MadhurYaadConstants.EXTRA_SONG_TITLE)
-            ?: "Gemini Man"
+        val requestedRawName = intent.getStringExtra(
+            MadhurYaadConstants.EXTRA_SONG_RAW_NAME,
+        ) ?: MusicLibrary.RANDOM_RAW_NAME
 
-        val scheduleId = intent?.getIntExtra(MadhurYaadConstants.EXTRA_SCHEDULE_ID, -1) ?: -1
-        val hour = intent?.getIntExtra(MadhurYaadConstants.EXTRA_HOUR, 7) ?: 7
-        val minute = intent?.getIntExtra(MadhurYaadConstants.EXTRA_MINUTE, 0) ?: 0
+        val selectedSong = MusicLibrary.resolvePlayableSong(
+            context = this,
+            requestedRawName = requestedRawName,
+        )
+
+        val songRawName = selectedSong.rawName
+        val songTitle = selectedSong.title
+
+        val scheduleId = intent.getIntExtra(
+            MadhurYaadConstants.EXTRA_SCHEDULE_ID,
+            -1,
+        )
+
+        val hour = intent.getIntExtra(
+            MadhurYaadConstants.EXTRA_HOUR,
+            7,
+        )
+
+        val minute = intent.getIntExtra(
+            MadhurYaadConstants.EXTRA_MINUTE,
+            0,
+        )
 
         startAsForeground(songTitle)
 
         ScheduleStorage.saveCurrentlyPlaying(
-            this, scheduleId, hour, minute, songRawName, songTitle
+            context = this,
+            scheduleId = scheduleId,
+            hour = hour,
+            minute = minute,
+            songRawName = songRawName,
+            songTitle = songTitle,
         )
 
         broadcastPlaybackStarted(
@@ -51,60 +80,86 @@ class SongPlayerService : Service() {
             hour = hour,
             minute = minute,
             songRawName = songRawName,
-            songTitle = songTitle
+            songTitle = songTitle,
         )
 
-        playSong(songRawName, songTitle)
+        playSong(
+            songRawName = songRawName,
+            songTitle = songTitle,
+        )
 
         return START_NOT_STICKY
-    }
-
-    private fun getSongResourceId(songRawName: String): Int {
-        return when (songRawName) {
-            "gemini_man" -> R.raw.gemini_man
-            "hard_man" -> R.raw.hard_man
-            "magnet_man" -> R.raw.magnet_man
-            "needle_man" -> R.raw.needle_man
-            "shadow_man" -> R.raw.shadow_man
-            "snake_man" -> R.raw.snake_man
-            "spark_man" -> R.raw.spark_man
-            "stage_chosen" -> R.raw.stage_chosen
-            "title_screen" -> R.raw.title_screen
-            "top_man" -> R.raw.top_man
-            else -> R.raw.gemini_man
-        }
     }
 
     private fun playSong(songRawName: String, songTitle: String) {
         stopCurrentMediaOnly()
 
-        val songResourceId = getSongResourceId(songRawName)
+        val songResourceId = MusicLibrary.getResourceId(songRawName)
 
-        mediaPlayer = MediaPlayer.create(this, songResourceId)
+        if (songResourceId == null) {
+            Toast.makeText(
+                this,
+                "Song file not found: $songRawName",
+                Toast.LENGTH_LONG,
+            ).show()
 
-        if (mediaPlayer == null) {
-            Toast.makeText(this, "Could not play song", Toast.LENGTH_LONG).show()
             stopPlayback()
             return
         }
 
-        mediaPlayer?.setWakeMode(applicationContext, PowerManager.PARTIAL_WAKE_LOCK)
-        mediaPlayer?.isLooping = false
-        mediaPlayer?.setVolume(1.0f, 1.0f)
+        try {
+            val player = MediaPlayer()
+            mediaPlayer = player
 
-        mediaPlayer?.setOnCompletionListener {
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build(),
+            )
+
+            player.setWakeMode(
+                applicationContext,
+                PowerManager.PARTIAL_WAKE_LOCK,
+            )
+
+            resources.openRawResourceFd(songResourceId).use { afd ->
+                player.setDataSource(
+                    afd.fileDescriptor,
+                    afd.startOffset,
+                    afd.length,
+                )
+                player.prepare()
+            }
+
+            player.isLooping = false
+            player.setVolume(1.0f, 1.0f)
+
+            player.setOnCompletionListener {
+                stopPlayback()
+            }
+
+            player.setOnErrorListener { _, _, _ ->
+                stopPlayback()
+                true
+            }
+
+            player.start()
+
+            Toast.makeText(
+                this,
+                "Playing: $songTitle",
+                Toast.LENGTH_SHORT,
+            ).show()
+        } catch (_: Exception) {
+            Toast.makeText(
+                this,
+                "Could not play song: $songTitle",
+                Toast.LENGTH_LONG,
+            ).show()
+
             stopPlayback()
         }
-
-        mediaPlayer?.setOnErrorListener { _, _, _ ->
-            Toast.makeText(this, "Song playback error", Toast.LENGTH_LONG).show()
-            stopPlayback()
-            true
-        }
-
-        mediaPlayer?.start()
-
-        Toast.makeText(this, "Playing: $songTitle", Toast.LENGTH_SHORT).show()
     }
 
     private fun stopCurrentMediaOnly() {
@@ -115,7 +170,11 @@ class SongPlayerService : Service() {
         } catch (_: Exception) {
         }
 
-        mediaPlayer?.release()
+        try {
+            mediaPlayer?.release()
+        } catch (_: Exception) {
+        }
+
         mediaPlayer = null
     }
 
@@ -135,6 +194,7 @@ class SongPlayerService : Service() {
 
     override fun onDestroy() {
         stopCurrentMediaOnly()
+
         ScheduleStorage.clearCurrentPlaying(this)
         broadcastPlaybackStopped()
 
@@ -157,27 +217,24 @@ class SongPlayerService : Service() {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK,
             )
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+            )
         }
     }
 
     private fun createNotification(songTitle: String): Notification {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("Madhur Yaad")
-                .setContentText("Playing: $songTitle")
-                .setSmallIcon(android.R.drawable.ic_media_play)
-                .build()
-        } else {
-            Notification.Builder(this)
-                .setContentTitle("Madhur Yaad")
-                .setContentText("Playing: $songTitle")
-                .setSmallIcon(android.R.drawable.ic_media_play)
-                .build()
-        }
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Madhur Yaad")
+            .setContentText("Playing: $songTitle")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
     }
 
     private fun createNotificationChannel() {
@@ -185,7 +242,7 @@ class SongPlayerService : Service() {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "Madhur Yaad Playback",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_LOW,
             )
 
             val manager = getSystemService(NotificationManager::class.java)
@@ -198,7 +255,7 @@ class SongPlayerService : Service() {
         hour: Int,
         minute: Int,
         songRawName: String,
-        songTitle: String
+        songTitle: String,
     ) {
         val intent = Intent(MadhurYaadConstants.ACTION_PLAYBACK_STARTED).apply {
             setPackage(packageName)

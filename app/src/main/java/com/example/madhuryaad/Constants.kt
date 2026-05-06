@@ -15,6 +15,7 @@ object MadhurYaadConstants {
     const val PREF_SCHEDULES = "schedules"
     const val PREF_NEXT_ID = "next_id"
     const val PREF_USE_24_HOUR = "use_24_hour"
+    const val PREF_HAS_INITIALIZED = "has_initialized"
 
     const val PREF_CURRENT_IS_PLAYING = "current_is_playing"
     const val PREF_CURRENT_SCHEDULE_ID = "current_schedule_id"

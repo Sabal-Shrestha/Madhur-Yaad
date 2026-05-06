@@ -30,12 +30,12 @@ object AlarmScheduler {
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val triggerTime = getNextTriggerTime(schedule.hour, schedule.minute)
-        val pendingIntent = createPendingIntent(context, schedule, PendingIntent.FLAG_UPDATE_CURRENT)
+        val pendingIntent = createPendingIntent(context, schedule)
 
         alarmManager.setExactAndAllowWhileIdle(
             AlarmManager.RTC_WAKEUP,
             triggerTime,
-            pendingIntent
+            pendingIntent,
         )
 
         return true
@@ -82,7 +82,6 @@ object AlarmScheduler {
     private fun createPendingIntent(
         context: Context,
         schedule: ScheduleItem,
-        baseFlag: Int
     ): PendingIntent {
         val intent = Intent(context, SongReceiver::class.java).apply {
             action = MadhurYaadConstants.ACTION_PLAY_SCHEDULED_SONG
@@ -97,7 +96,7 @@ object AlarmScheduler {
             context,
             schedule.id,
             intent,
-            baseFlag or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
